@@ -51,6 +51,7 @@ function laserEnd(e) {
 const strokes = ref([]); // 每条 = 点数组 [{x,y}] 内容坐标
 const trailFading = ref(false);
 let fadeTimer = null;
+let drawing = false;
 const canvasEl = ref(null);
 const trailSvg = ref(null);
 
@@ -67,6 +68,7 @@ function fitTrailSvg() {
 }
 function trailDown(e) {
   clearTimeout(fadeTimer);
+  drawing = true;
   if (trailFading.value) { strokes.value = []; trailFading.value = false; }
   strokes.value.push([contentPoint(e)]);
   fitTrailSvg();
@@ -76,6 +78,11 @@ function trailMove(e) {
   fitTrailSvg();
 }
 function trailUp() {
+  // pointerup 后还会紧跟一个 pointerleave(释放隐式捕获),
+  // drawing 标记保证一次抬笔只起一个淡出定时器
+  if (!drawing) return;
+  drawing = false;
+  clearTimeout(fadeTimer);
   fadeTimer = setTimeout(() => {
     trailFading.value = true; // CSS 0.8s 淡出,结束后清空
     setTimeout(() => { strokes.value = []; trailFading.value = false; }, 800);
