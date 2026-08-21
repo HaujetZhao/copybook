@@ -113,7 +113,6 @@ function renderTrail() {
   if (baked) ctx.drawImage(baked, 0, 0);
   for (let i = 0; i + 1 < cur.length; i++) strokeSegment(ctx, cur[i], cur[i + 1], dpr);
   if (cur.length === 1) strokeSegment(ctx, cur[0], null, dpr);
-  // (纯红笔迹无 shadow)
 }
 function requestRender() {
   if (rafId) return;
