@@ -443,8 +443,10 @@ function onPointerUp(e) {
   color: #fff;
   background: #000d;
   border-left: 1px solid #fff3;
+  pointer-events: none; /* 面板整体透点,不挡下面的页面操作 */
 }
 .debug-head {
+  pointer-events: auto;
   display: flex;
   justify-content: space-between;
   align-items: center;
