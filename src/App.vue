@@ -91,9 +91,9 @@ function fitTrail() {
 // 每点带压力 p(笔 0~1,鼠标恒 0.5),线宽随压力变化
 function widthOf(pt) {
   const dpr = window.devicePixelRatio || 1;
-  return (2 + 3 * (pt.p ?? 0.5)) * dpr;
+  return (4 + 5 * (pt.p ?? 0.5)) * dpr;
 }
-// 画一段纯红笔迹,线宽随压力
+// 画一段两层笔迹:红外圈 + 白芯,线宽随压力
 function strokeSegment(c2d, a, b, dpr) {
   const w = Math.max(widthOf(a), widthOf(b));
   c2d.beginPath();
@@ -103,6 +103,9 @@ function strokeSegment(c2d, a, b, dpr) {
   c2d.lineCap = 'round';
   c2d.strokeStyle = '#ff3b30';
   c2d.lineWidth = w;
+  c2d.stroke();
+  c2d.strokeStyle = '#fff';
+  c2d.lineWidth = Math.max(1, w - 3 * dpr);
   c2d.stroke();
 }
 // 每帧:烘焙层贴回来 + 当前笔画整条重画(清了再画,无叠加色差)
