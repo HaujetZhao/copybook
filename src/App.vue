@@ -53,36 +53,73 @@ function laserEnd(e) {
   else laser.value = null;
 }
 
-// 荧光笔迹模式:笔迹留在画布内容层(跟文字一起滚动),笔离开 1 秒后整批淡出;
-// 淡出前再次落笔则清掉计时,重新计时 —— 方便反复临摹。
-const strokes = ref([]); // 每条 = 点数组 [{x,y}] 内容坐标
+// 荧光笔迹模式:笔迹用 canvas 2D 增量绘制(原生 shadowBlur 光晕,Safari 稳定),
+// 留在画布内容层跟文字一起滚动;笔离开 1 秒后整批淡出,淡出前再落笔重置计时。
 const trailFading = ref(false);
 let fadeTimer = null;
 let drawing = false;
 const canvasEl = ref(null);
-const trailSvg = ref(null);
+const trailEl = ref(null); // 绘制笔迹的 canvas
+let ctx = null;
+let lastPt = null;
 
 function contentPoint(e) {
   const r = canvasEl.value.getBoundingClientRect();
   return { x: e.clientX - r.left + canvasEl.value.scrollLeft, y: e.clientY - r.top + canvasEl.value.scrollTop };
 }
-function fitTrailSvg() {
-  const s = trailSvg.value;
-  if (s) {
-    s.setAttribute('width', canvasEl.value.scrollWidth);
-    s.setAttribute('height', canvasEl.value.scrollHeight);
+// canvas 尺寸跟随滚动区域(含 devicePixelRatio,保证光晕不糊)
+function fitTrail() {
+  const c = trailEl.value, host = canvasEl.value;
+  if (!c || !host) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = host.scrollWidth, h = host.scrollHeight;
+  let old = null;
+  if (c.width !== w * dpr || c.height !== h * dpr) {
+    // 扩大画布会清空已有内容,重设尺寸前把旧内容暂存画回来
+    old = document.createElement('canvas');
+    old.width = c.width; old.height = c.height;
+    old.getContext('2d').drawImage(c, 0, 0);
+    c.width = w * dpr; c.height = h * dpr;
+    c.style.width = w + 'px'; c.style.height = h + 'px';
+    ctx = null;
   }
+  if (!ctx) {
+    ctx = c.getContext('2d');
+    if (old) ctx.drawImage(old, 0, 0);
+    setTrailStyle();
+  }
+}
+function setTrailStyle() {
+  const dpr = window.devicePixelRatio || 1;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 4 * dpr;
+  ctx.strokeStyle = '#fff';
+  ctx.shadowColor = 'rgba(255,59,48,0.9)';
+  ctx.shadowBlur = 8 * dpr;
+}
+function drawSegment(a, b) {
+  const dpr = window.devicePixelRatio || 1;
+  ctx.beginPath();
+  ctx.moveTo(a.x * dpr, a.y * dpr);
+  ctx.lineTo(b.x * dpr, b.y * dpr);
+  ctx.stroke();
 }
 function trailDown(e) {
   clearTimeout(fadeTimer);
   drawing = true;
-  if (trailFading.value) { strokes.value = []; trailFading.value = false; }
-  strokes.value.push([contentPoint(e)]);
-  fitTrailSvg();
+  if (trailFading.value) {
+    trailFading.value = false;
+    ctx.clearRect(0, 0, trailEl.value.width, trailEl.value.height);
+  }
+  fitTrail();
+  lastPt = contentPoint(e);
+  drawSegment(lastPt, lastPt); // 落笔即出一个圆点
 }
 function trailMove(e) {
-  strokes.value.at(-1).push(contentPoint(e));
-  fitTrailSvg();
+  const p = contentPoint(e);
+  drawSegment(lastPt, p);
+  lastPt = p;
 }
 function trailUp() {
   // pointerup 后还会紧跟一个 pointerleave(释放隐式捕获),
@@ -92,7 +129,10 @@ function trailUp() {
   clearTimeout(fadeTimer);
   fadeTimer = setTimeout(() => {
     trailFading.value = true; // CSS 0.8s 淡出,结束后清空
-    setTimeout(() => { strokes.value = []; trailFading.value = false; }, 800);
+    setTimeout(() => {
+      trailFading.value = false;
+      ctx && ctx.clearRect(0, 0, trailEl.value.width, trailEl.value.height);
+    }, 800);
   }, 1000);
 }
 
@@ -150,12 +190,7 @@ function onPointerUp(e) {
       @pointerleave="onPointerUp"
     >
       荆霄鹏行楷
-      <svg v-if="laserMode === 'trail' && !editable" ref="trailSvg" class="trail" :class="{ fading: trailFading }">
-        <polyline
-          v-for="(s, i) in strokes" :key="i"
-          :points="s.map(p => p.x + ',' + p.y).join(' ')"
-        />
-      </svg>
+      <canvas v-if="laserMode === 'trail' && !editable" ref="trailEl" class="trail" :class="{ fading: trailFading }"></canvas>
     </div>
     <!-- 激光点放 body 层级,fixed 定位避免被画布滚动影响 -->
     <Teleport to="body">
@@ -265,18 +300,8 @@ function onPointerUp(e) {
   position: absolute;
   top: 0;
   left: 0;
-  overflow: visible;
   pointer-events: none;
   transition: opacity 0.8s;
-  /* 红色光晕挂在 svg 根上:Safari 对 SVG 子元素的 CSS filter 支持不稳 */
-  filter: drop-shadow(0 0 4px #ff3b30cc) drop-shadow(0 0 10px #ff3b3088);
-}
-.trail polyline {
-  fill: none;
-  stroke: #fff;
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .trail.fading { opacity: 0; }
 .laser-dot {
