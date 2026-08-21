@@ -353,9 +353,9 @@ function onPointerUp(e) {
           @click="theme = t"
         >{{ t.name }}</button>
       </div>
-      <div v-if="!editable" class="seg">
-        <button :class="{ active: laserMode === 'dot' }" @click="laserMode = 'dot'">光点</button>
-        <button :class="{ active: laserMode === 'trail' }" @click="laserMode = 'trail'">笔迹</button>
+      <div class="seg" :class="{ disabled: editable }">
+        <button :disabled="editable" :class="{ active: laserMode === 'dot' }" @click="laserMode = 'dot'">光点</button>
+        <button :disabled="editable" :class="{ active: laserMode === 'trail' }" @click="laserMode = 'trail'">笔迹</button>
       </div>
       <div class="edit-switch">
         <label class="switch" :class="{ on: editable }" @click.prevent="editable = !editable">
@@ -421,8 +421,8 @@ function onPointerUp(e) {
   align-items: center;
   gap: 10px;
   flex: 1;
-  min-width: 160px;
-  max-width: 320px;
+  min-width: 80px;
+  max-width: 160px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -445,6 +445,8 @@ function onPointerUp(e) {
   transition: all 0.15s;
 }
 .seg button + button { border-left: 1px solid var(--border); }
+.seg.disabled { opacity: 0.45; }
+.seg.disabled button { cursor: default; }
 .seg button.active {
   color: var(--bg);
   background: var(--accent);
