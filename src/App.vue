@@ -10,9 +10,9 @@ const themes = [
 // 持久化:主题/字号/可编辑状态存 localStorage,刷新后恢复
 const saved = JSON.parse(localStorage.getItem('jxp') || '{}');
 const editable = ref(saved.editable ?? true);
-const size = ref(saved.size ?? 64);
+const size = ref(saved.size ?? 50);
 const laserMode = ref(saved.laserMode ?? 'dot'); // 'dot' 点跟随 | 'trail' 荧光笔迹
-const theme = ref(themes.find(t => t.name === saved.theme) ?? themes[0]);
+const theme = ref(themes.find(t => t.name === saved.theme) ?? themes[2]); // 默认黛蓝
 
 // 限制最大宽度后,页面外的 body 露出区域也要跟主题同色
 watchEffect(() => {
@@ -382,7 +382,13 @@ function onPointerUp(e) {
       @pointerleave="onPointerUp"
       @input="saveText"
       @paste="pastePlain"
-    >{{ saved.text ?? '荆霄鹏行楷' }}
+    >{{ saved.text ?? `个人进步是解决所有矛盾的最优解。
+
+美，激发生理喜欢；
+强，激发新里程拜。
+
+物质是态度的试金石，
+精神滋养是自然延伸。` }}
       <canvas v-if="laserMode === 'trail' && !editable" ref="trailEl" class="trail" :class="{ fading: trailFading }"></canvas>
     </div>
     <!-- 激光点放 body 层级,fixed 定位避免被画布滚动影响 -->
