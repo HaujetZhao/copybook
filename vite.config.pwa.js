@@ -11,9 +11,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       manifest: {
-        name: '荆霄鹏字体预览',
-        short_name: '荆霄鹏',
-        description: '输入文字,用荆霄鹏字体预览。',
+        name: '练字板',
+        short_name: '练字板',
+        description: '书法字体练字板:临摹、激光笔、多主题。',
         theme_color: '#1e1f24',
         background_color: '#1e1f24',
         display: 'standalone',
