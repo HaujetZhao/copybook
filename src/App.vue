@@ -304,7 +304,10 @@ function onPointerDown(e) {
 }
 function onPointerMove(e) {
   if (editable.value || e.pointerType === 'touch') { laserMove(e); return; }
-  if (laserMode.value === 'trail') { if (e.buttons) trailMove(e); }
+  if (laserMode.value === 'trail') {
+    if (e.buttons) trailMove(e);
+    else laserMove(e); // 鼠标 hover 未按键:显示光点指示位置(笔迹模式下 cursor:none)
+  }
   else laserMove(e);
 }
 function onPointerUp(e) {
