@@ -136,7 +136,7 @@ window.addEventListener('resize', refreshTrailLayer);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTrailLayer(); });
 // 字体加载完成后布局会变高,重新适配画布,避免位图被拉伸发糊
 document.fonts?.ready?.then(refreshTrailLayer);
-// 固定线宽(压感方案已移除,待重新规划):红外圈 4px,白芯 1px(4-3)
+// 固定线宽(压感方案已移除,待重新规划):红外圈 4px,白芯 2px(4-2)
 function widthOf() {
   const dpr = window.devicePixelRatio || 1;
   return 4 * dpr;
@@ -174,7 +174,7 @@ function strokePath(c2d, pts, dpr) {
     c2d.fillStyle = '#ff3b30';
     c2d.fill();
     c2d.beginPath();
-    c2d.arc(pts[0].x * dpr, pts[0].y * dpr, Math.max(1, (w - 3 * dpr) / 2), 0, Math.PI * 2);
+    c2d.arc(pts[0].x * dpr, pts[0].y * dpr, Math.max(1, (w - 2 * dpr) / 2), 0, Math.PI * 2);
     c2d.fillStyle = '#fff';
     c2d.fill();
     return;
@@ -186,7 +186,7 @@ function strokePath(c2d, pts, dpr) {
   }
   for (let i = 0; i + 1 < pts.length; i++) {
     c2d.strokeStyle = '#fff';
-    c2d.lineWidth = Math.max(1, seg(i) - 3 * dpr);
+    c2d.lineWidth = Math.max(1, seg(i) - 2 * dpr);
     c2d.stroke();
   }
 }
