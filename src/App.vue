@@ -66,7 +66,7 @@ let rafId = null;
 
 function contentPoint(e) {
   const r = canvasEl.value.getBoundingClientRect();
-  return { x: e.clientX - r.left + canvasEl.value.scrollLeft, y: e.clientY - r.top + canvasEl.value.scrollTop };
+  return { x: e.clientX - r.left + canvasEl.value.scrollLeft, y: e.clientY - r.top + canvasEl.value.scrollTop, p: e.pressure || 0.5 };
 }
 // canvas 尺寸跟随滚动区域(含 devicePixelRatio,保证光晕不糊)
 function fitTrail() {
@@ -80,38 +80,55 @@ function fitTrail() {
   ctx = c.getContext('2d');
   renderTrail();
 }
-// 全量重绘:光晕(红)和亮芯(白)各描一遍,整条单路径,颜色均匀
+// 每点带压力 p(笔 0~1,鼠标恒 0.5),线宽随压力变化:白芯(2~5px)+红边圈+外光晕
+function widthOf(pt) {
+  const dpr = window.devicePixelRatio || 1;
+  return (2 + 3 * (pt.p ?? 0.5)) * dpr;
+}
+// 全量重绘:按段变宽(圆头衔接),分三个 pass 画完整条再画下一层,
+// 避免层间交叠产生色差:光晕(红+shadowBlur)→红边圈→白芯
 function renderTrail() {
   const c = trailEl.value;
   const dpr = window.devicePixelRatio || 1;
   ctx.clearRect(0, 0, c.width, c.height);
   ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
   for (const s of strokes) {
-    if (s.length === 1) {
-      // 单点:画个圆
+    for (let i = 0; i + 1 < s.length; i++) {
+      const w = Math.max(widthOf(s[i]), widthOf(s[i + 1]));
       ctx.beginPath();
-      ctx.arc(s[0].x * dpr, s[0].y * dpr, 2 * dpr, 0, Math.PI * 2);
-      ctx.fillStyle = '#fff';
+      ctx.moveTo(s[i].x * dpr, s[i].y * dpr);
+      ctx.lineTo(s[i + 1].x * dpr, s[i + 1].y * dpr);
+      // 光晕层
+      ctx.strokeStyle = 'rgba(255,59,48,0.9)';
+      ctx.lineWidth = w + 3 * dpr;
+      ctx.shadowColor = 'rgba(255,59,48,0.9)';
+      ctx.shadowBlur = 8 * dpr;
+      ctx.stroke();
+      // 红边圈
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#ff2d20';
+      ctx.lineWidth = w;
+      ctx.stroke();
+      // 白芯
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(1, w - 2.5 * dpr);
+      ctx.stroke();
+    }
+    if (s.length === 1) {
+      // 单点:画个带光晕的圆
+      const w = widthOf(s[0]);
+      ctx.beginPath();
+      ctx.arc(s[0].x * dpr, s[0].y * dpr, w / 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff2d20';
       ctx.shadowColor = 'rgba(255,59,48,0.9)';
       ctx.shadowBlur = 8 * dpr;
       ctx.fill();
-      continue;
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(s[0].x * dpr, s[0].y * dpr, Math.max(1, w / 2 - 1.25 * dpr), 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
     }
-    ctx.beginPath();
-    ctx.moveTo(s[0].x * dpr, s[0].y * dpr);
-    for (let i = 1; i < s.length; i++) ctx.lineTo(s[i].x * dpr, s[i].y * dpr);
-    // 光晕层
-    ctx.strokeStyle = 'rgba(255,59,48,0.9)';
-    ctx.lineWidth = 4 * dpr;
-    ctx.shadowColor = 'rgba(255,59,48,0.9)';
-    ctx.shadowBlur = 8 * dpr;
-    ctx.stroke();
-    // 亮芯层
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2.5 * dpr;
-    ctx.stroke();
   }
   ctx.shadowBlur = 0;
 }
