@@ -100,12 +100,8 @@ if (debug.value) {
 
 function contentPoint(e) {
   const r = canvasEl.value.getBoundingClientRect();
-  // 压力原始信号抖动大(相邻采样能跳 0.02↔0.19),指数平滑后再用
-  const raw = e.pressure || 0.5;
-  pSmooth = pSmooth == null || e.type === 'pointerdown' ? raw : pSmooth + 0.25 * (raw - pSmooth);
-  return { x: e.clientX - r.left + canvasEl.value.scrollLeft, y: e.clientY - r.top + canvasEl.value.scrollTop, p: pSmooth };
+  return { x: e.clientX - r.left + canvasEl.value.scrollLeft, y: e.clientY - r.top + canvasEl.value.scrollTop };
 }
-let pSmooth = null;
 // canvas 尺寸跟随滚动区域(含 devicePixelRatio,保证光晕不糊)
 function fitTrail() {
   const c = trailEl.value, host = canvasEl.value;
@@ -140,24 +136,13 @@ window.addEventListener('resize', refreshTrailLayer);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTrailLayer(); });
 // 字体加载完成后布局会变高,重新适配画布,避免位图被拉伸发糊
 document.fonts?.ready?.then(refreshTrailLayer);
-// 线宽随压力变化。Apple Pencil 在 Safari 里 pressure 实际只报 0.03~0.13 这类小区间
-// 而非规范上的 0~1,固定映射会让笔画永远细 —— 用运行期 min/max 自适应归一化。
-// 鼠标恒报 0.5(区间宽度为 0 时落到中值)。
-let pMin = 1, pMax = 0;
-function normPressure(p) {
-  pMin = Math.min(pMin, p);
-  pMax = Math.max(pMax, p);
-  const range = pMax - pMin;
-  if (range < 0.01) return 0.5; // 只有一个压力值(鼠标)时取中值
-  return (p - pMin) / range;
-}
-function widthOf(pt) {
+// 固定线宽(压感方案已移除,待重新规划)
+function widthOf() {
   const dpr = window.devicePixelRatio || 1;
-  return (1.5 + 6 * normPressure(pt.p)) * dpr;
+  return 4 * dpr;
 }
-// 段宽取两端均值而非较大值,轻重过渡更跟手
-function segWidth(a, b) {
-  return (widthOf(a) + widthOf(b)) / 2;
+function segWidth() {
+  return widthOf();
 }
 // 画整条笔画:先把全部红外圈画完,再画全部白芯 ——
 // 若逐段红白交替,后一段的红圈会盖住前一段的白芯,接头处出现红斑。
