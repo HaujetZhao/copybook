@@ -315,6 +315,12 @@ function onPointerDown(e) {
 function onPointerMove(e) {
   if (editable.value || e.pointerType === 'touch') { laserMove(e); return; }
   if (laserMode.value === 'trail') {
+    // 鼠标淡出中回到画布:hover 即取消淡出,旧迹瞬间恢复
+    if (trailFading.value && !e.buttons) {
+      clearTimeout(fadeTimer);
+      mouseFadePending = true; // 重新挂起:再次移出才继续消失
+      trailFading.value = false;
+    }
     if (e.buttons) trailMove(e);
     else laserMove(e); // 鼠标 hover 未按键:显示光点指示位置(笔迹模式下 cursor:none)
   }
