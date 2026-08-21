@@ -357,11 +357,12 @@ function onPointerUp(e) {
         <button :class="{ active: laserMode === 'dot' }" @click="laserMode = 'dot'">光点</button>
         <button :class="{ active: laserMode === 'trail' }" @click="laserMode = 'trail'">笔迹</button>
       </div>
-      <button
-        class="toggle"
-        :class="{ on: editable }"
-        @click="editable = !editable"
-      >{{ editable ? '可编辑' : '仅预览' }}</button>
+      <div class="edit-switch">
+        <label class="switch" :class="{ on: editable }" @click.prevent="editable = !editable">
+          <span class="knob"></span>
+        </label>
+        <span class="switch-label">{{ editable ? '编辑' : '预览' }}</span>
+      </div>
     </div>
     <div
       ref="canvasEl"
@@ -464,6 +465,33 @@ function onPointerUp(e) {
   background: var(--accent);
   border-color: var(--accent);
 }
+
+/* 编辑/预览拨动开关 */
+.edit-switch { display: flex; align-items: center; gap: 8px; }
+.switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--border);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.switch.on { background: var(--accent); }
+.switch .knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px #0004;
+  transition: left 0.2s;
+}
+.switch.on .knob { left: 22px; }
+.switch-label { font-size: 13px; color: var(--muted); }
 
 .canvas {
   flex: 1;
