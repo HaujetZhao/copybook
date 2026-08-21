@@ -252,6 +252,7 @@ function requestRender() {
 function trailDown(e) {
   clearTimeout(fadeTimer);
   drawing = true;
+  mouseFadePending = false;
   // 画笔迹时隐藏光点,避免它停在起笔处、松开才跳过来
   laser.value = null;
   // 淡出中落笔:取消淡出,旧笔迹保留(瞬间恢复,不清空),继续接着画
@@ -275,7 +276,19 @@ function trailMove(e) {
   cur.push(p);
   requestRender();
 }
-function trailUp() {
+// 鼠标的笔迹:抬笔不立即淡出,等鼠标移出画布才淡出(笔仍抬笔即淡出)
+let mouseFadePending = false;
+function startFade() {
+  trailFading.value = true;
+  fadeTimer = setTimeout(() => {
+    trailFading.value = false;
+    mouseFadePending = false;
+    const b = baked && baked.getContext('2d');
+    b && b.clearRect(0, 0, baked.width, baked.height);
+    ctx && renderTrail();
+  }, 800);
+}
+function trailUp(e) {
   // pointerup 后还会紧跟一个 pointerleave(释放隐式捕获),
   // drawing 标记保证一次抬笔只起一个淡出定时器
   if (!drawing) return;
@@ -287,14 +300,9 @@ function trailUp() {
   }
   cur = [];
   requestRender();
-  // 抬笔立即开始淡出,0.8s 后清空;淡出中再落笔则恢复(trailDown 已处理)
-  trailFading.value = true;
-  fadeTimer = setTimeout(() => {
-    trailFading.value = false;
-    const b = baked && baked.getContext('2d');
-    b && b.clearRect(0, 0, baked.width, baked.height);
-    ctx && renderTrail();
-  }, 800);
+  if (e.pointerType === 'mouse') { mouseFadePending = true; return; }
+  // 笔:抬笔立即开始淡出,0.8s 后清空;淡出中再落笔则恢复(trailDown 已处理)
+  startFade();
 }
 
 // 统一分发:预览态下笔/鼠标 → 按模式处理;手指 → 转发滚动
@@ -315,7 +323,13 @@ function onPointerMove(e) {
 function onPointerUp(e) {
   if (debug.value) updateDebug(e);
   laserEnd(e);
-  if (!editable.value && e.pointerType !== 'touch' && laserMode.value === 'trail') trailUp();
+  if (!editable.value && e.pointerType !== 'touch' && laserMode.value === 'trail') trailUp(e);
+  // 鼠标移出画布:挂起的淡出开始
+  if (e.type === 'pointerleave' && mouseFadePending) {
+    mouseFadePending = false;
+    clearTimeout(fadeTimer);
+    startFade();
+  }
 }
 </script>
 
