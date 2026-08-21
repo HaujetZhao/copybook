@@ -187,15 +187,14 @@ function trailUp() {
   }
   cur = [];
   requestRender();
+  // 抬笔立即开始淡出,0.8s 后清空;淡出中再落笔则恢复(trailDown 已处理)
+  trailFading.value = true;
   fadeTimer = setTimeout(() => {
-    trailFading.value = true; // CSS 0.8s 淡出,结束后清空
-    setTimeout(() => {
-      trailFading.value = false;
-      const b = baked && baked.getContext('2d');
-      b && b.clearRect(0, 0, baked.width, baked.height);
-      ctx && renderTrail();
-    }, 800);
-  }, 1000);
+    trailFading.value = false;
+    const b = baked && baked.getContext('2d');
+    b && b.clearRect(0, 0, baked.width, baked.height);
+    ctx && renderTrail();
+  }, 800);
 }
 
 // 统一分发:预览态下笔/鼠标 → 按模式处理;手指 → 转发滚动
