@@ -88,6 +88,17 @@ function fitTrail() {
   if (old) baked.getContext('2d').drawImage(old, 0, 0);
   renderTrail();
 }
+// Safari 画布合成层bug:位图会被低分辨率缓存,切回标签页才清晰。
+// 视口/dpr 变化或页面重新可见时,重置位图强制以当前 dpr 重新光栅化。
+function refreshTrailLayer() {
+  const c = trailEl.value;
+  if (!c || !ctx) return;
+  fitTrail();
+  c.width = c.width; // 重置位图(清空),内容随后由 renderTrail 从烘焙层重画
+  renderTrail();
+}
+window.addEventListener('resize', refreshTrailLayer);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTrailLayer(); });
 // 每点带压力 p(笔 0~1,鼠标恒 0.5),线宽随压力变化
 function widthOf(pt) {
   const dpr = window.devicePixelRatio || 1;
