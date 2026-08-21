@@ -24,14 +24,25 @@ watch([editable, size, theme], () => {
   }));
 }, { deep: true });
 
-// 激光笔:预览态下指针/触控笔在画布上不滚动不选中,只留一个跟随光点
+// 激光笔:预览态下,触控笔/鼠标在画布上只留一个跟随光点(不滚动不选中);
+// 手指则手动转发滚动(画布 touch-action:none 是为了拦下笔的滚动,手指的滚动在这里补回)
 const laser = ref(null); // { x, y } 视口坐标
+let lastTouch = null;
 function laserMove(e) {
   if (editable.value) return;
-  laser.value = { x: e.clientX, y: e.clientY };
+  if (e.pointerType === 'touch') {
+    laser.value = null;
+    if (lastTouch) {
+      e.currentTarget.scrollBy(lastTouch.x - e.clientX, lastTouch.y - e.clientY);
+    }
+    lastTouch = { x: e.clientX, y: e.clientY };
+  } else {
+    laser.value = { x: e.clientX, y: e.clientY };
+  }
 }
-function laserEnd() {
-  laser.value = null;
+function laserEnd(e) {
+  if (e.pointerType === 'touch') lastTouch = null;
+  else laser.value = null;
 }
 </script>
 
