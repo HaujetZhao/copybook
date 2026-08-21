@@ -57,14 +57,34 @@ function laserEnd(e) {
 // 每帧只需 drawImage(烘焙层) + 重绘当前这一笔,成本恒定不随笔迹总量增长。
 // 纯红色笔迹,线宽随笔压力变化。
 const trailFading = ref(false);
-// ?debug 打开右上角调试面板:显示 dpr/画布尺寸/最近压力采样,用于真机诊断
+// ?debug 打开右侧日志面板:记录关键事件与采样,可一键 POST 到 dev server 终端
 const debug = ref(location.search.includes('debug'));
-const debugInfo = ref('');
-function updateDebug(e) {
+const debugLogs = ref([]);
+function dlog(msg) {
   if (!debug.value) return;
-  const c = trailEl.value;
-  debugInfo.value =
-    `dpr ${window.devicePixelRatio} | bitmap ${c ? c.width + 'x' + c.height : '-'} | css ${c ? c.style.width + 'x' + c.style.height : '-'} | scroll ${canvasEl.value ? canvasEl.value.scrollWidth + 'x' + canvasEl.value.scrollHeight : '-'} | press ${e.pressure} type ${e.pointerType}`;
+  debugLogs.value.push(`${new Date().toLocaleTimeString()} ${msg}`);
+}
+function snapshot() {
+  const c = trailEl.value, host = canvasEl.value;
+  return `dpr ${window.devicePixelRatio} bitmap ${c ? c.width + 'x' + c.height : '-'} css ${c ? c.style.width + 'x' + c.style.height : '-'} scroll ${host ? host.scrollWidth + 'x' + host.scrollHeight : '-'}`;
+}
+function updateDebug(e) {
+  dlog(`${e.type} type=${e.pointerType} press=${e.pressure} buttons=${e.buttons} ${snapshot()}`);
+}
+async function sendLogs() {
+  await fetch('/debug-log', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(debugLogs.value),
+  });
+  dlog('已发送到 dev server 终端');
+}
+if (debug.value) {
+  window.addEventListener('error', ev => dlog(`ERROR ${ev.message}`));
+  window.addEventListener('resize', () => dlog(`resize ${snapshot()}`));
+  document.addEventListener('visibilitychange', () => dlog(`visibility hidden=${document.hidden} ${snapshot()}`));
+  document.fonts?.ready?.then(() => dlog(`fonts.ready ${snapshot()}`));
+  dlog(`页面加载 ${snapshot()}`);
 }
 let fadeTimer = null;
 let drawing = false;
@@ -191,8 +211,10 @@ function trailDown(e) {
   cur = [contentPoint(e)];
   requestRender();
 }
+let debugMoveCount = 0;
 function trailMove(e) {
-  updateDebug(e);
+  // 每 20 个 move 采样一条,够诊断又不刷屏
+  if (debug.value && ++debugMoveCount % 20 === 0) updateDebug(e);
   const p = contentPoint(e), last = cur.at(-1);
   // 太密的点跳过,减绘计量也减轻慢画时的光晕叠色
   if (Math.hypot(p.x - last.x, p.y - last.y) < 1.5) return;
@@ -223,6 +245,7 @@ function trailUp() {
 
 // 统一分发:预览态下笔/鼠标 → 按模式处理;手指 → 转发滚动
 function onPointerDown(e) {
+  updateDebug(e);
   if (editable.value || e.pointerType === 'touch') { laserMove(e); return; }
   if (laserMode.value === 'trail') trailDown(e);
   else laserMove(e);
@@ -233,6 +256,7 @@ function onPointerMove(e) {
   else laserMove(e);
 }
 function onPointerUp(e) {
+  if (debug.value) updateDebug(e);
   laserEnd(e);
   if (!editable.value && e.pointerType !== 'touch' && laserMode.value === 'trail') trailUp();
 }
@@ -280,7 +304,15 @@ function onPointerUp(e) {
     <!-- 激光点放 body 层级,fixed 定位避免被画布滚动影响 -->
     <Teleport to="body">
       <div v-if="laser" class="laser-dot" :style="{ left: laser.x + 'px', top: laser.y + 'px' }"></div>
-      <div v-if="debug" class="debug-panel">{{ debugInfo }}</div>
+      <div v-if="debug" class="debug-panel">
+        <div class="debug-head">
+          <span>日志 ({{ debugLogs.length }})</span>
+          <button @click="sendLogs">发送</button>
+        </div>
+        <div class="debug-list">
+          <div v-for="(l, i) in debugLogs" :key="i">{{ l }}</div>
+        </div>
+      </div>
     </Teleport>
   </div>
 </template>
@@ -395,17 +427,41 @@ function onPointerUp(e) {
 }
 .debug-panel {
   position: fixed;
-  top: 4px;
-  right: 6px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 33vw;
+  min-width: 260px;
   z-index: 10000;
+  display: flex;
+  flex-direction: column;
   font-family: monospace;
   font-size: 11px;
   color: #fff;
-  background: #000c;
-  padding: 4px 8px;
+  background: #000d;
+  border-left: 1px solid #fff3;
+}
+.debug-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid #fff3;
+}
+.debug-head button {
+  font-size: 12px;
+  padding: 2px 12px;
+  border: none;
   border-radius: 6px;
-  pointer-events: none;
-  max-width: 90vw;
+  background: #4263eb;
+  color: #fff;
+}
+.debug-list {
+  flex: 1;
+  overflow: auto;
+  padding: 6px 10px;
+  line-height: 1.6;
+  word-break: break-all;
 }
 .laser-dot {
   position: fixed;
