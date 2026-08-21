@@ -1,5 +1,5 @@
 {
-  "name": "jingxiaopeng",
+  "name": "copybook",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -17,5 +17,6 @@
     "vite": "^5.0.0",
     "vite-plugin-pwa": "^0.20.0",
     "vite-plugin-singlefile": "^2.0.0"
-  }
+  },
+  "description": "练字板 — 书法临摹 PWA"
 }
