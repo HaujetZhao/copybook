@@ -1,0 +1,13 @@
+@font-face {
+  font-family: '荆霄鹏行楷';
+  src: url('./assets/fonts/JingXiaoPengXingKai.ttf') format('truetype');
+  font-display: swap;
+}
+
+html, body, #app { height: 100%; margin: 0; }
+
+body {
+  font-family: system-ui, 'Microsoft YaHei', sans-serif;
+  background: #1e1f24;
+  color: #e6e4e0;
+}
