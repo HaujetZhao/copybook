@@ -517,6 +517,7 @@ function onPointerUp(e) {
   border-radius: 12px;
   line-height: 1.5;
   word-break: break-all;
+  white-space: pre-wrap; /* 恢复的默认文本含换行符,需保留 */
   outline: none;
   caret-color: var(--accent);
   transition: background 0.2s;
