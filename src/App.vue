@@ -107,7 +107,9 @@ function oneEuro() {
   return {
     reset() { xPrev = yPrev = null; dxPrev = dyPrev = 0; },
     filter(x, y, dt) {
-      const minCutoff = 0.8, beta = 0.02, dCutoff = 1.0;
+      // minCutoff:基础平滑(调低更顺/拐角更圆;调高更跟手/斜线略抖)
+      // beta:速度自适应(调大快笔时更快停止滤波,保住快速曲线形状)
+      const minCutoff = 1.2, beta = 0.04, dCutoff = 1.0;
       if (xPrev === null) { xPrev = x; yPrev = y; return { x, y }; }
       const a1 = alpha(minCutoff, dt);
       xPrev = a1 * x + (1 - a1) * xPrev;
