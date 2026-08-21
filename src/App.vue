@@ -93,20 +93,38 @@ function widthOf(pt) {
   const dpr = window.devicePixelRatio || 1;
   return (4 + 5 * (pt.p ?? 0.5)) * dpr;
 }
-// 画一段两层笔迹:红外圈 + 白芯,线宽随压力
-function strokeSegment(c2d, a, b, dpr) {
-  const w = Math.max(widthOf(a), widthOf(b));
-  c2d.beginPath();
-  c2d.moveTo(a.x * dpr, a.y * dpr);
-  if (b) c2d.lineTo(b.x * dpr, b.y * dpr);
-  else c2d.lineTo(a.x * dpr + 0.01, a.y * dpr);
+// 画整条笔画:先把全部红外圈画完,再画全部白芯 ——
+// 若逐段红白交替,后一段的红圈会盖住前一段的白芯,接头处出现红斑
+function strokePath(c2d, pts, dpr) {
   c2d.lineCap = 'round';
-  c2d.strokeStyle = '#ff3b30';
-  c2d.lineWidth = w;
-  c2d.stroke();
-  c2d.strokeStyle = '#fff';
-  c2d.lineWidth = Math.max(1, w - 3 * dpr);
-  c2d.stroke();
+  const seg = (a, b) => {
+    const w = Math.max(widthOf(a), widthOf(b));
+    c2d.beginPath();
+    c2d.moveTo(a.x * dpr, a.y * dpr);
+    if (b) c2d.lineTo(b.x * dpr, b.y * dpr);
+    else c2d.lineTo(a.x * dpr + 0.01, a.y * dpr);
+    return w;
+  };
+  if (pts.length === 1) {
+    const w = seg(pts[0], null);
+    c2d.strokeStyle = '#ff3b30';
+    c2d.lineWidth = w;
+    c2d.stroke();
+    c2d.strokeStyle = '#fff';
+    c2d.lineWidth = Math.max(1, w - 3 * dpr);
+    c2d.stroke();
+    return;
+  }
+  for (let i = 0; i + 1 < pts.length; i++) {
+    c2d.strokeStyle = '#ff3b30';
+    c2d.lineWidth = seg(pts[i], pts[i + 1]);
+    c2d.stroke();
+  }
+  for (let i = 0; i + 1 < pts.length; i++) {
+    c2d.strokeStyle = '#fff';
+    c2d.lineWidth = Math.max(1, seg(pts[i], pts[i + 1]) - 3 * dpr);
+    c2d.stroke();
+  }
 }
 // 每帧:烘焙层贴回来 + 当前笔画整条重画(清了再画,无叠加色差)
 function renderTrail() {
@@ -114,8 +132,7 @@ function renderTrail() {
   const dpr = window.devicePixelRatio || 1;
   ctx.clearRect(0, 0, c.width, c.height);
   if (baked) ctx.drawImage(baked, 0, 0);
-  for (let i = 0; i + 1 < cur.length; i++) strokeSegment(ctx, cur[i], cur[i + 1], dpr);
-  if (cur.length === 1) strokeSegment(ctx, cur[0], null, dpr);
+  if (cur.length) strokePath(ctx, cur, dpr);
 }
 function requestRender() {
   if (rafId) return;
@@ -152,11 +169,7 @@ function trailUp() {
   clearTimeout(fadeTimer);
   // 当前笔画烘焙进离屏层,后续帧不再重画它
   if (baked && cur.length) {
-    const b = baked.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    b.lineCap = 'round';
-    for (let i = 0; i + 1 < cur.length; i++) strokeSegment(b, cur[i], cur[i + 1], dpr);
-    if (cur.length === 1) strokeSegment(b, cur[0], null, dpr);
+    strokePath(baked.getContext('2d'), cur, window.devicePixelRatio || 1);
   }
   cur = [];
   requestRender();
