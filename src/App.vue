@@ -53,7 +53,7 @@ function laserEnd(e) {
   else laser.value = null;
 }
 
-// 荧光笔迹模式:笔迹留在画布内容层(跟文字一起滚动),笔离开 3 秒后整批淡出;
+// 荧光笔迹模式:笔迹留在画布内容层(跟文字一起滚动),笔离开 1 秒后整批淡出;
 // 淡出前再次落笔则清掉计时,重新计时 —— 方便反复临摹。
 const strokes = ref([]); // 每条 = 点数组 [{x,y}] 内容坐标
 const trailFading = ref(false);
