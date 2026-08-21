@@ -26,7 +26,7 @@ watchEffect(() => {
   document.body.style.webkitTouchCallout = editable.value ? '' : 'none';
 });
 
-watch([editable, size, theme], () => {
+watch([editable, size, laserMode, theme], () => {
   localStorage.setItem('jxp', JSON.stringify({
     editable: editable.value, size: size.value, laserMode: laserMode.value, theme: theme.value.name,
   }));
