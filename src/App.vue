@@ -136,10 +136,10 @@ window.addEventListener('resize', refreshTrailLayer);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTrailLayer(); });
 // 字体加载完成后布局会变高,重新适配画布,避免位图被拉伸发糊
 document.fonts?.ready?.then(refreshTrailLayer);
-// 固定线宽(压感方案已移除,待重新规划)
+// 固定线宽(压感方案已移除,待重新规划):红外圈 7px,白芯 4px(7-3)
 function widthOf() {
   const dpr = window.devicePixelRatio || 1;
-  return 4 * dpr;
+  return 7 * dpr;
 }
 function segWidth() {
   return widthOf();
