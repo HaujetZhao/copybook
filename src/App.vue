@@ -19,6 +19,13 @@ watchEffect(() => {
   document.body.style.background = theme.value.vars['--bg'];
 });
 
+// 预览态全页禁选中/禁长按呼出菜单,防止临摹时误选画布外文字
+watchEffect(() => {
+  document.body.style.userSelect = editable.value ? '' : 'none';
+  document.body.style.webkitUserSelect = editable.value ? '' : 'none';
+  document.body.style.webkitTouchCallout = editable.value ? '' : 'none';
+});
+
 watch([editable, size, theme], () => {
   localStorage.setItem('jxp', JSON.stringify({
     editable: editable.value, size: size.value, laserMode: laserMode.value, theme: theme.value.name,
