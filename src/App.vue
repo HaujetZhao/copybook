@@ -93,7 +93,7 @@ function trailUp() {
   fadeTimer = setTimeout(() => {
     trailFading.value = true; // CSS 0.8s 淡出,结束后清空
     setTimeout(() => { strokes.value = []; trailFading.value = false; }, 800);
-  }, 3000);
+  }, 1000);
 }
 
 // 统一分发:预览态下笔/鼠标 → 按模式处理;手指 → 转发滚动
@@ -271,20 +271,20 @@ function onPointerUp(e) {
 }
 .trail polyline {
   fill: none;
-  stroke: #ff3b30;
+  stroke: #fff;
   stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 4px #ff3b3088);
+  filter: drop-shadow(0 0 4px #ff3b30cc) drop-shadow(0 0 10px #ff3b3088);
 }
 .trail.fading { opacity: 0; }
 .laser-dot {
   position: fixed;
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: #ff3b30;
-  box-shadow: 0 0 10px 3px #ff3b3088;
+  background: #fff;
+  box-shadow: 0 0 8px 3px #ff3b30cc, 0 0 18px 6px #ff3b3066;
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 9999;
