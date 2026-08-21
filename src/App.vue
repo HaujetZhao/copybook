@@ -380,7 +380,7 @@ function onPointerUp(e) {
     </div>
     <!-- 激光点放 body 层级,fixed 定位避免被画布滚动影响 -->
     <Teleport to="body">
-      <div v-if="laser" class="laser-dot" :style="{ left: laser.x + 'px', top: laser.y + 'px' }"></div>
+      <div v-if="laser" class="laser-dot" :class="{ pen: laserMode === 'trail' && !editable }" :style="{ left: laser.x + 'px', top: laser.y + 'px' }"></div>
       <div v-if="debug" class="debug-panel">
         <div class="debug-head">
           <span>日志 ({{ debugLogs.length }})</span>
@@ -544,13 +544,19 @@ function onPointerUp(e) {
 }
 .laser-dot {
   position: fixed;
-  width: 4px; /* 与笔迹线宽一致,视觉上就是"笔尖" */
-  height: 4px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 0 4px 2px #ff3b30cc;
+  box-shadow: 0 0 8px 3px #ff3b30cc, 0 0 18px 6px #ff3b3066;
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 9999;
+}
+/* 笔迹模式下光点是"笔尖"指示,缩到与线宽一致 */
+.laser-dot.pen {
+  width: 4px;
+  height: 4px;
+  box-shadow: 0 0 4px 2px #ff3b30cc;
 }
 </style>
