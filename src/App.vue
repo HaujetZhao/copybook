@@ -252,6 +252,8 @@ function requestRender() {
 function trailDown(e) {
   clearTimeout(fadeTimer);
   drawing = true;
+  // 画笔迹时隐藏光点,避免它停在起笔处、松开才跳过来
+  laser.value = null;
   // 淡出中落笔:取消淡出,旧笔迹保留(瞬间恢复,不清空),继续接着画
   trailFading.value = false;
   // 每次落笔强制重置位图:字体加载/布局变化会让 scrollWidth 变,
@@ -522,11 +524,11 @@ function onPointerUp(e) {
 }
 .laser-dot {
   position: fixed;
-  width: 10px;
-  height: 10px;
+  width: 4px; /* 与笔迹线宽一致,视觉上就是"笔尖" */
+  height: 4px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 0 8px 3px #ff3b30cc, 0 0 18px 6px #ff3b3066;
+  box-shadow: 0 0 4px 2px #ff3b30cc;
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 9999;
