@@ -55,7 +55,7 @@ function laserEnd(e) {
 
 // 荧光笔迹模式:性能方案 —— 抬笔后的旧笔迹「烘焙」进离屏画布,
 // 每帧只需 drawImage(烘焙层) + 重绘当前这一笔,成本恒定不随笔迹总量增长。
-// 白色亮芯 + 鲜红边圈 + 红色光晕,线宽随笔压力变化。
+// 纯红色笔迹,线宽随笔压力变化。
 const trailFading = ref(false);
 let fadeTimer = null;
 let drawing = false;
@@ -93,7 +93,7 @@ function widthOf(pt) {
   const dpr = window.devicePixelRatio || 1;
   return (2 + 3 * (pt.p ?? 0.5)) * dpr;
 }
-// 画一段三层笔迹:光晕(红+shadowBlur)→红边圈→白芯
+// 画一段纯红笔迹,线宽随压力
 function strokeSegment(c2d, a, b, dpr) {
   const w = Math.max(widthOf(a), widthOf(b));
   c2d.beginPath();
@@ -101,17 +101,8 @@ function strokeSegment(c2d, a, b, dpr) {
   if (b) c2d.lineTo(b.x * dpr, b.y * dpr);
   else c2d.lineTo(a.x * dpr + 0.01, a.y * dpr);
   c2d.lineCap = 'round';
-  c2d.strokeStyle = 'rgba(255,59,48,0.9)';
-  c2d.lineWidth = w + 3 * dpr;
-  c2d.shadowColor = 'rgba(255,59,48,0.9)';
-  c2d.shadowBlur = 8 * dpr;
-  c2d.stroke();
-  c2d.shadowBlur = 0;
-  c2d.strokeStyle = '#ff2d20';
+  c2d.strokeStyle = '#ff3b30';
   c2d.lineWidth = w;
-  c2d.stroke();
-  c2d.strokeStyle = '#fff';
-  c2d.lineWidth = Math.max(1, w - 2.5 * dpr);
   c2d.stroke();
 }
 // 每帧:烘焙层贴回来 + 当前笔画整条重画(清了再画,无叠加色差)
@@ -122,7 +113,7 @@ function renderTrail() {
   if (baked) ctx.drawImage(baked, 0, 0);
   for (let i = 0; i + 1 < cur.length; i++) strokeSegment(ctx, cur[i], cur[i + 1], dpr);
   if (cur.length === 1) strokeSegment(ctx, cur[0], null, dpr);
-  ctx.shadowBlur = 0;
+  // (纯红笔迹无 shadow)
 }
 function requestRender() {
   if (rafId) return;
