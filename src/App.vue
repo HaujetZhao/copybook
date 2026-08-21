@@ -349,7 +349,7 @@ function onPointerUp(e) {
       <div class="seg">
         <button
           v-for="t in themes" :key="t.name"
-          :class="{ active: t === theme }"
+          :class="{ active: t.name === theme.name }"
           @click="theme = t"
         >{{ t.name }}</button>
       </div>
