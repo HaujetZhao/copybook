@@ -26,9 +26,16 @@ watchEffect(() => {
   document.body.style.webkitTouchCallout = editable.value ? '' : 'none';
 });
 
+// 画布文字持久化:输入即存,刷新后恢复(内容在 contenteditable 里,不走 ref)
+function saveText(e) {
+  const cur = JSON.parse(localStorage.getItem('jxp') || '{}');
+  cur.text = e.target.innerText;
+  localStorage.setItem('jxp', JSON.stringify(cur));
+}
 watch([editable, size, laserMode, theme], () => {
   localStorage.setItem('jxp', JSON.stringify({
     editable: editable.value, size: size.value, laserMode: laserMode.value, theme: theme.value.name,
+    text: canvasEl.value?.innerText,
   }));
 }, { deep: true });
 
@@ -342,8 +349,8 @@ function onPointerUp(e) {
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
       @pointerleave="onPointerUp"
-    >
-      荆霄鹏行楷
+      @input="saveText"
+    >{{ saved.text ?? '荆霄鹏行楷' }}
       <canvas v-if="laserMode === 'trail' && !editable" ref="trailEl" class="trail" :class="{ fading: trailFading }"></canvas>
     </div>
     <!-- 激光点放 body 层级,fixed 定位避免被画布滚动影响 -->
