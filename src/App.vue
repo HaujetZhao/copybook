@@ -150,22 +150,18 @@ function segWidth() {
 function strokePath(c2d, pts, dpr) {
   c2d.lineCap = 'round';
   c2d.lineJoin = 'round';
-  // 构建第 i 段路径:中点(i-1,i)→中点(i,i+1),控制点 i;首尾段接原端点
+  // 构建第 i 段路径:从 pts[i] 一侧的中点出发,以 pts[i] 为控制点,
+  // 到 pts[i+1] 一侧的中点结束 —— 相邻段共享切线,整条曲线一阶连续
+  const mid = (p, q) => ({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
   const seg = (i) => {
     const a = pts[i], b = pts[i + 1];
+    const start = i === 0 ? a : mid(pts[i - 1], a);
+    const end = i + 2 >= pts.length ? b : mid(a, b);
+    const ctrl = a;
     c2d.beginPath();
-    if (i === 0) {
-      c2d.moveTo(a.x * dpr, a.y * dpr);
-    } else {
-      const m0x = (pts[i - 1].x + a.x) / 2, m0y = (pts[i - 1].y + a.y) / 2;
-      c2d.moveTo(m0x * dpr, m0y * dpr);
-    }
-    if (i + 2 >= pts.length) {
-      c2d.lineTo(b.x * dpr, b.y * dpr);
-    } else {
-      const m1x = (a.x + b.x) / 2, m1y = (a.y + b.y) / 2;
-      c2d.quadraticCurveTo(b.x * dpr, b.y * dpr, m1x * dpr, m1y * dpr);
-    }
+    c2d.moveTo(start.x * dpr, start.y * dpr);
+    if (start === a && end === b) c2d.lineTo(b.x * dpr, b.y * dpr);
+    else c2d.quadraticCurveTo(ctrl.x * dpr, ctrl.y * dpr, end.x * dpr, end.y * dpr);
     return segWidth(a, b);
   };
   if (pts.length === 1) {
