@@ -26,6 +26,11 @@ watchEffect(() => {
   document.body.style.webkitTouchCallout = editable.value ? '' : 'none';
 });
 
+// 粘贴只取纯文本,拒绝富文本样式
+function pastePlain(e) {
+  e.preventDefault();
+  document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+}
 // 画布文字持久化:输入即存,刷新后恢复(内容在 contenteditable 里,不走 ref)
 function saveText(e) {
   const cur = JSON.parse(localStorage.getItem('jxp') || '{}');
@@ -376,6 +381,7 @@ function onPointerUp(e) {
       @pointercancel="onPointerUp"
       @pointerleave="onPointerUp"
       @input="saveText"
+      @paste="pastePlain"
     >{{ saved.text ?? '荆霄鹏行楷' }}
       <canvas v-if="laserMode === 'trail' && !editable" ref="trailEl" class="trail" :class="{ fading: trailFading }"></canvas>
     </div>
