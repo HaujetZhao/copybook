@@ -99,10 +99,12 @@ function refreshTrailLayer() {
 }
 window.addEventListener('resize', refreshTrailLayer);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTrailLayer(); });
-// 每点带压力 p(笔 0~1,鼠标恒 0.5),线宽随压力变化
+// 字体加载完成后布局会变高,重新适配画布,避免位图被拉伸发糊
+document.fonts?.ready?.then(refreshTrailLayer);
+// 每点带压力 p(笔 0~1,鼠标恒 0.5),线宽随压力变化;低起点让提笔能收尖
 function widthOf(pt) {
   const dpr = window.devicePixelRatio || 1;
-  return (4 + 5 * (pt.p ?? 0.5)) * dpr;
+  return (1.5 + 6 * (pt.p ?? 0.5)) * dpr;
 }
 // 画整条笔画:先把全部红外圈画完,再画全部白芯 ——
 // 若逐段红白交替,后一段的红圈会盖住前一段的白芯,接头处出现红斑。
@@ -171,7 +173,12 @@ function trailDown(e) {
   drawing = true;
   // 淡出中落笔:取消淡出,旧笔迹保留(瞬间恢复,不清空),继续接着画
   trailFading.value = false;
+  // 每次落笔强制重置位图:字体加载/布局变化会让 scrollWidth 变,
+  // 旧位图被 CSS 拉伸就会模糊(Safari),重画一次即按当前布局对齐
   fitTrail();
+  const c = trailEl.value;
+  if (c) { c.width = c.width; ctx = c.getContext('2d'); }
+  renderTrail();
   cur = [contentPoint(e)];
   requestRender();
 }
