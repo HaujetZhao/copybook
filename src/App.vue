@@ -23,6 +23,16 @@ watch([editable, size, theme], () => {
     editable: editable.value, size: size.value, theme: theme.value.name,
   }));
 }, { deep: true });
+
+// 激光笔:预览态下指针/触控笔在画布上不滚动不选中,只留一个跟随光点
+const laser = ref(null); // { x, y } 视口坐标
+function laserMove(e) {
+  if (editable.value) return;
+  laser.value = { x: e.clientX, y: e.clientY };
+}
+function laserEnd() {
+  laser.value = null;
+}
 </script>
 
 <template>
@@ -47,9 +57,19 @@ watch([editable, size, theme], () => {
     </div>
     <div
       class="canvas"
+      :class="{ laser: !editable }"
       :contenteditable="editable"
       :style="{ fontSize: size + 'px' }"
+      @pointerdown="laserMove"
+      @pointermove="laserMove"
+      @pointerup="laserEnd"
+      @pointercancel="laserEnd"
+      @pointerleave="laserEnd"
     >荆霄鹏行楷</div>
+    <!-- 激光点放 body 层级,fixed 定位避免被画布滚动影响 -->
+    <Teleport to="body">
+      <div v-if="laser" class="laser-dot" :style="{ left: laser.x + 'px', top: laser.y + 'px' }"></div>
+    </Teleport>
   </div>
 </template>
 
@@ -140,4 +160,23 @@ watch([editable, size, theme], () => {
 }
 .canvas[contenteditable='true'] { border-color: var(--border); }
 .canvas[contenteditable='true']:focus { border-color: var(--accent); }
+
+/* 激光笔模式:画布吃掉所有触控,不滚动不选中 */
+.canvas.laser {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: none;
+}
+.laser-dot {
+  position: fixed;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ff3b30;
+  box-shadow: 0 0 10px 3px #ff3b3088;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 9999;
+}
 </style>
