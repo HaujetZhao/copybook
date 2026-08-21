@@ -81,10 +81,6 @@ async function sendLogs() {
 }
 if (debug.value) {
   window.addEventListener('error', ev => dlog(`ERROR ${ev.message}`));
-  window.addEventListener('resize', () => dlog(`resize ${snapshot()}`));
-  document.addEventListener('visibilitychange', () => dlog(`visibility hidden=${document.hidden} ${snapshot()}`));
-  document.fonts?.ready?.then(() => dlog(`fonts.ready ${snapshot()}`));
-  dlog(`页面加载 ${snapshot()}`);
 }
 let fadeTimer = null;
 let drawing = false;
@@ -94,6 +90,13 @@ let ctx = null;
 let baked = null; // 离屏画布,存已抬笔的笔迹
 let cur = []; // 当前正在画的笔画 [{x,y,p}] 内容坐标
 let rafId = null;
+if (debug.value) {
+  // 放声明之后:snapshot 依赖 canvasEl/trailEl,提前执行会 TDZ 报错白屏
+  window.addEventListener('resize', () => dlog(`resize ${snapshot()}`));
+  document.addEventListener('visibilitychange', () => dlog(`visibility hidden=${document.hidden} ${snapshot()}`));
+  document.fonts?.ready?.then(() => dlog(`fonts.ready ${snapshot()}`));
+  dlog(`页面加载 ${snapshot()}`);
+}
 
 function contentPoint(e) {
   const r = canvasEl.value.getBoundingClientRect();
