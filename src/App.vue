@@ -98,9 +98,44 @@ if (debug.value) {
   dlog(`页面加载 ${snapshot()}`);
 }
 
+// One Euro 滤波:笔迹输入去抖的标准算法 —— 快速移动时低延迟不拖影,
+// 慢速/斜线时强力平滑压抖。参数:minCutoff 越小平滑越强,beta 越大对快速
+// 移动越跟手。落笔时重置。
+function oneEuro() {
+  let xPrev = null, yPrev = null, dxPrev = 0, dyPrev = 0;
+  const alpha = (cutoff, dt) => 1 / (1 + 1 / (2 * Math.PI * cutoff * dt));
+  return {
+    reset() { xPrev = yPrev = null; dxPrev = dyPrev = 0; },
+    filter(x, y, dt) {
+      const minCutoff = 0.8, beta = 0.02, dCutoff = 1.0;
+      if (xPrev === null) { xPrev = x; yPrev = y; return { x, y }; }
+      const a1 = alpha(minCutoff, dt);
+      xPrev = a1 * x + (1 - a1) * xPrev;
+      yPrev = a1 * y + (1 - a1) * yPrev;
+      // 用速度自适应调截止频率:动得越快滤波越弱
+      const aD = alpha(dCutoff, dt);
+      dxPrev = aD * (x - xPrev) / dt + (1 - aD) * dxPrev;
+      dyPrev = aD * (y - yPrev) / dt + (1 - aD) * dyPrev;
+      const cutoffX = minCutoff + beta * Math.abs(dxPrev);
+      const cutoffY = minCutoff + beta * Math.abs(dyPrev);
+      const a2x = alpha(cutoffX, dt), a2y = alpha(cutoffY, dt);
+      xPrev = a2x * x + (1 - a2x) * xPrev;
+      yPrev = a2y * y + (1 - a2y) * yPrev;
+      return { x: xPrev, y: yPrev };
+    },
+  };
+}
+const euro = oneEuro();
+let lastPtTime = null;
 function contentPoint(e) {
   const r = canvasEl.value.getBoundingClientRect();
-  return { x: e.clientX - r.left + canvasEl.value.scrollLeft, y: e.clientY - r.top + canvasEl.value.scrollTop };
+  const x = e.clientX - r.left + canvasEl.value.scrollLeft;
+  const y = e.clientY - r.top + canvasEl.value.scrollTop;
+  const now = e.timeStamp;
+  if (e.type === 'pointerdown' || lastPtTime === null) euro.reset();
+  const dt = Math.min(Math.max((now - (lastPtTime ?? now - 8)) / 1000, 0.001), 0.1);
+  lastPtTime = now;
+  return euro.filter(x, y, dt);
 }
 // canvas 尺寸跟随滚动区域(含 devicePixelRatio,保证光晕不糊)
 function fitTrail() {
