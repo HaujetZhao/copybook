@@ -11,6 +11,7 @@ const themes = [
 const saved = JSON.parse(localStorage.getItem('jxp') || '{}');
 const editable = ref(saved.editable ?? true);
 const size = ref(saved.size ?? 64);
+const laserMode = ref(saved.laserMode ?? 'dot'); // 'dot' 点跟随 | 'trail' 荧光笔迹
 const theme = ref(themes.find(t => t.name === saved.theme) ?? themes[0]);
 
 // 限制最大宽度后,页面外的 body 露出区域也要跟主题同色
@@ -20,7 +21,7 @@ watchEffect(() => {
 
 watch([editable, size, theme], () => {
   localStorage.setItem('jxp', JSON.stringify({
-    editable: editable.value, size: size.value, theme: theme.value.name,
+    editable: editable.value, size: size.value, laserMode: laserMode.value, theme: theme.value.name,
   }));
 }, { deep: true });
 
@@ -44,6 +45,58 @@ function laserEnd(e) {
   if (e.pointerType === 'touch') lastTouch = null;
   else laser.value = null;
 }
+
+// 荧光笔迹模式:笔迹留在画布内容层(跟文字一起滚动),笔离开 3 秒后整批淡出;
+// 淡出前再次落笔则清掉计时,重新计时 —— 方便反复临摹。
+const strokes = ref([]); // 每条 = 点数组 [{x,y}] 内容坐标
+const trailFading = ref(false);
+let fadeTimer = null;
+const canvasEl = ref(null);
+const trailSvg = ref(null);
+
+function contentPoint(e) {
+  const r = canvasEl.value.getBoundingClientRect();
+  return { x: e.clientX - r.left + canvasEl.value.scrollLeft, y: e.clientY - r.top + canvasEl.value.scrollTop };
+}
+function fitTrailSvg() {
+  const s = trailSvg.value;
+  if (s) {
+    s.setAttribute('width', canvasEl.value.scrollWidth);
+    s.setAttribute('height', canvasEl.value.scrollHeight);
+  }
+}
+function trailDown(e) {
+  clearTimeout(fadeTimer);
+  if (trailFading.value) { strokes.value = []; trailFading.value = false; }
+  strokes.value.push([contentPoint(e)]);
+  fitTrailSvg();
+}
+function trailMove(e) {
+  strokes.value.at(-1).push(contentPoint(e));
+  fitTrailSvg();
+}
+function trailUp() {
+  fadeTimer = setTimeout(() => {
+    trailFading.value = true; // CSS 0.8s 淡出,结束后清空
+    setTimeout(() => { strokes.value = []; trailFading.value = false; }, 800);
+  }, 3000);
+}
+
+// 统一分发:预览态下笔/鼠标 → 按模式处理;手指 → 转发滚动
+function onPointerDown(e) {
+  if (editable.value || e.pointerType === 'touch') { laserMove(e); return; }
+  if (laserMode.value === 'trail') trailDown(e);
+  else laserMove(e);
+}
+function onPointerMove(e) {
+  if (editable.value || e.pointerType === 'touch') { laserMove(e); return; }
+  if (laserMode.value === 'trail') { if (e.buttons) trailMove(e); }
+  else laserMove(e);
+}
+function onPointerUp(e) {
+  laserEnd(e);
+  if (!editable.value && e.pointerType !== 'touch' && laserMode.value === 'trail') trailUp();
+}
 </script>
 
 <template>
@@ -60,6 +113,10 @@ function laserEnd(e) {
           @click="theme = t"
         >{{ t.name }}</button>
       </div>
+      <div v-if="!editable" class="seg">
+        <button :class="{ active: laserMode === 'dot' }" @click="laserMode = 'dot'">光点</button>
+        <button :class="{ active: laserMode === 'trail' }" @click="laserMode = 'trail'">笔迹</button>
+      </div>
       <button
         class="toggle"
         :class="{ on: editable }"
@@ -67,16 +124,25 @@ function laserEnd(e) {
       >{{ editable ? '可编辑' : '仅预览' }}</button>
     </div>
     <div
+      ref="canvasEl"
       class="canvas"
       :class="{ laser: !editable }"
       :contenteditable="editable"
       :style="{ fontSize: size + 'px' }"
-      @pointerdown="laserMove"
-      @pointermove="laserMove"
-      @pointerup="laserEnd"
-      @pointercancel="laserEnd"
-      @pointerleave="laserEnd"
-    >荆霄鹏行楷</div>
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
+      @pointerup="onPointerUp"
+      @pointercancel="onPointerUp"
+      @pointerleave="onPointerUp"
+    >
+      荆霄鹏行楷
+      <svg v-if="laserMode === 'trail' && !editable" ref="trailSvg" class="trail" :class="{ fading: trailFading }">
+        <polyline
+          v-for="(s, i) in strokes" :key="i"
+          :points="s.map(p => p.x + ',' + p.y).join(' ')"
+        />
+      </svg>
+    </div>
     <!-- 激光点放 body 层级,fixed 定位避免被画布滚动影响 -->
     <Teleport to="body">
       <div v-if="laser" class="laser-dot" :style="{ left: laser.x + 'px', top: laser.y + 'px' }"></div>
@@ -179,6 +245,25 @@ function laserEnd(e) {
   -webkit-user-select: none;
   cursor: none;
 }
+/* 荧光笔迹层:绝对定位于滚动内容原点,随内容一起滚动 */
+.canvas { position: relative; }
+.trail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+  transition: opacity 0.8s;
+}
+.trail polyline {
+  fill: none;
+  stroke: #ff3b30;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px #ff3b3088);
+}
+.trail.fading { opacity: 0; }
 .laser-dot {
   position: fixed;
   width: 14px;
