@@ -53,15 +53,16 @@ function laserEnd(e) {
   else laser.value = null;
 }
 
-// 荧光笔迹模式:笔迹用 canvas 2D 增量绘制(原生 shadowBlur 光晕,Safari 稳定),
-// 留在画布内容层跟文字一起滚动;笔离开 1 秒后整批淡出,淡出前再落笔重置计时。
+// 荧光笔迹模式:canvas 2D 每帧整条重绘(单路径描边,光晕只算一次,无接头),
+// 白色亮芯 + 红色 shadowBlur 光晕;笔离开 1 秒后整批淡出,淡出前再落笔重置计时。
 const trailFading = ref(false);
 let fadeTimer = null;
 let drawing = false;
 const canvasEl = ref(null);
 const trailEl = ref(null); // 绘制笔迹的 canvas
 let ctx = null;
-let lastPt = null;
+let strokes = []; // 每条 = 点数组 [{x,y}] 内容坐标
+let rafId = null;
 
 function contentPoint(e) {
   const r = canvasEl.value.getBoundingClientRect();
@@ -72,54 +73,69 @@ function fitTrail() {
   const c = trailEl.value, host = canvasEl.value;
   if (!c || !host) return;
   const dpr = window.devicePixelRatio || 1;
-  const w = host.scrollWidth, h = host.scrollHeight;
-  let old = null;
-  if (c.width !== w * dpr || c.height !== h * dpr) {
-    // 扩大画布会清空已有内容,重设尺寸前把旧内容暂存画回来
-    old = document.createElement('canvas');
-    old.width = c.width; old.height = c.height;
-    old.getContext('2d').drawImage(c, 0, 0);
-    c.width = w * dpr; c.height = h * dpr;
-    c.style.width = w + 'px'; c.style.height = h + 'px';
-    ctx = null;
-  }
-  if (!ctx) {
-    ctx = c.getContext('2d');
-    if (old) ctx.drawImage(old, 0, 0);
-    setTrailStyle();
-  }
+  c.width = host.scrollWidth * dpr;
+  c.height = host.scrollHeight * dpr;
+  c.style.width = host.scrollWidth + 'px';
+  c.style.height = host.scrollHeight + 'px';
+  ctx = c.getContext('2d');
+  renderTrail();
 }
-function setTrailStyle() {
+// 全量重绘:光晕(红)和亮芯(白)各描一遍,整条单路径,颜色均匀
+function renderTrail() {
+  const c = trailEl.value;
   const dpr = window.devicePixelRatio || 1;
+  ctx.clearRect(0, 0, c.width, c.height);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.lineWidth = 4 * dpr;
-  ctx.strokeStyle = '#fff';
-  ctx.shadowColor = 'rgba(255,59,48,0.9)';
-  ctx.shadowBlur = 8 * dpr;
+  for (const s of strokes) {
+    if (s.length === 1) {
+      // 单点:画个圆
+      ctx.beginPath();
+      ctx.arc(s[0].x * dpr, s[0].y * dpr, 2 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = 'rgba(255,59,48,0.9)';
+      ctx.shadowBlur = 8 * dpr;
+      ctx.fill();
+      continue;
+    }
+    ctx.beginPath();
+    ctx.moveTo(s[0].x * dpr, s[0].y * dpr);
+    for (let i = 1; i < s.length; i++) ctx.lineTo(s[i].x * dpr, s[i].y * dpr);
+    // 光晕层
+    ctx.strokeStyle = 'rgba(255,59,48,0.9)';
+    ctx.lineWidth = 4 * dpr;
+    ctx.shadowColor = 'rgba(255,59,48,0.9)';
+    ctx.shadowBlur = 8 * dpr;
+    ctx.stroke();
+    // 亮芯层
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.5 * dpr;
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
 }
-function drawSegment(a, b) {
-  const dpr = window.devicePixelRatio || 1;
-  ctx.beginPath();
-  ctx.moveTo(a.x * dpr, a.y * dpr);
-  ctx.lineTo(b.x * dpr, b.y * dpr);
-  ctx.stroke();
+function requestRender() {
+  if (rafId) return;
+  rafId = requestAnimationFrame(() => {
+    rafId = null;
+    renderTrail();
+  });
 }
 function trailDown(e) {
   clearTimeout(fadeTimer);
   drawing = true;
   if (trailFading.value) {
     trailFading.value = false;
-    ctx.clearRect(0, 0, trailEl.value.width, trailEl.value.height);
+    strokes = [];
   }
   fitTrail();
-  lastPt = contentPoint(e);
-  drawSegment(lastPt, lastPt); // 落笔即出一个圆点
+  strokes.push([contentPoint(e)]);
+  requestRender();
 }
 function trailMove(e) {
-  const p = contentPoint(e);
-  drawSegment(lastPt, p);
-  lastPt = p;
+  strokes.at(-1).push(contentPoint(e));
+  requestRender();
 }
 function trailUp() {
   // pointerup 后还会紧跟一个 pointerleave(释放隐式捕获),
@@ -131,7 +147,8 @@ function trailUp() {
     trailFading.value = true; // CSS 0.8s 淡出,结束后清空
     setTimeout(() => {
       trailFading.value = false;
-      ctx && ctx.clearRect(0, 0, trailEl.value.width, trailEl.value.height);
+      strokes = [];
+      ctx && renderTrail();
     }, 800);
   }, 1000);
 }
