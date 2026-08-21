@@ -53,15 +53,17 @@ function laserEnd(e) {
   else laser.value = null;
 }
 
-// 荧光笔迹模式:canvas 2D 每帧整条重绘(单路径描边,光晕只算一次,无接头),
-// 白色亮芯 + 红色 shadowBlur 光晕;笔离开 1 秒后整批淡出,淡出前再落笔重置计时。
+// 荧光笔迹模式:性能方案 —— 抬笔后的旧笔迹「烘焙」进离屏画布,
+// 每帧只需 drawImage(烘焙层) + 重绘当前这一笔,成本恒定不随笔迹总量增长。
+// 白色亮芯 + 鲜红边圈 + 红色光晕,线宽随笔压力变化。
 const trailFading = ref(false);
 let fadeTimer = null;
 let drawing = false;
 const canvasEl = ref(null);
-const trailEl = ref(null); // 绘制笔迹的 canvas
+const trailEl = ref(null); // 显示用 canvas
 let ctx = null;
-let strokes = []; // 每条 = 点数组 [{x,y}] 内容坐标
+let baked = null; // 离屏画布,存已抬笔的笔迹
+let cur = []; // 当前正在画的笔画 [{x,y,p}] 内容坐标
 let rafId = null;
 
 function contentPoint(e) {
@@ -73,63 +75,53 @@ function fitTrail() {
   const c = trailEl.value, host = canvasEl.value;
   if (!c || !host) return;
   const dpr = window.devicePixelRatio || 1;
-  c.width = host.scrollWidth * dpr;
-  c.height = host.scrollHeight * dpr;
+  const w = host.scrollWidth * dpr, h = host.scrollHeight * dpr;
+  if (c.width === w && c.height === h) return;
+  // 扩容时把烘焙层内容搬到新尺寸
+  const old = baked;
+  c.width = w; c.height = h;
   c.style.width = host.scrollWidth + 'px';
   c.style.height = host.scrollHeight + 'px';
   ctx = c.getContext('2d');
+  baked = document.createElement('canvas');
+  baked.width = w; baked.height = h;
+  if (old) baked.getContext('2d').drawImage(old, 0, 0);
   renderTrail();
 }
-// 每点带压力 p(笔 0~1,鼠标恒 0.5),线宽随压力变化:白芯(2~5px)+红边圈+外光晕
+// 每点带压力 p(笔 0~1,鼠标恒 0.5),线宽随压力变化
 function widthOf(pt) {
   const dpr = window.devicePixelRatio || 1;
   return (2 + 3 * (pt.p ?? 0.5)) * dpr;
 }
-// 全量重绘:按段变宽(圆头衔接),分三个 pass 画完整条再画下一层,
-// 避免层间交叠产生色差:光晕(红+shadowBlur)→红边圈→白芯
+// 画一段三层笔迹:光晕(红+shadowBlur)→红边圈→白芯
+function strokeSegment(c2d, a, b, dpr) {
+  const w = Math.max(widthOf(a), widthOf(b));
+  c2d.beginPath();
+  c2d.moveTo(a.x * dpr, a.y * dpr);
+  if (b) c2d.lineTo(b.x * dpr, b.y * dpr);
+  else c2d.lineTo(a.x * dpr + 0.01, a.y * dpr);
+  c2d.lineCap = 'round';
+  c2d.strokeStyle = 'rgba(255,59,48,0.9)';
+  c2d.lineWidth = w + 3 * dpr;
+  c2d.shadowColor = 'rgba(255,59,48,0.9)';
+  c2d.shadowBlur = 8 * dpr;
+  c2d.stroke();
+  c2d.shadowBlur = 0;
+  c2d.strokeStyle = '#ff2d20';
+  c2d.lineWidth = w;
+  c2d.stroke();
+  c2d.strokeStyle = '#fff';
+  c2d.lineWidth = Math.max(1, w - 2.5 * dpr);
+  c2d.stroke();
+}
+// 每帧:烘焙层贴回来 + 当前笔画整条重画(清了再画,无叠加色差)
 function renderTrail() {
   const c = trailEl.value;
   const dpr = window.devicePixelRatio || 1;
   ctx.clearRect(0, 0, c.width, c.height);
-  ctx.lineCap = 'round';
-  for (const s of strokes) {
-    for (let i = 0; i + 1 < s.length; i++) {
-      const w = Math.max(widthOf(s[i]), widthOf(s[i + 1]));
-      ctx.beginPath();
-      ctx.moveTo(s[i].x * dpr, s[i].y * dpr);
-      ctx.lineTo(s[i + 1].x * dpr, s[i + 1].y * dpr);
-      // 光晕层
-      ctx.strokeStyle = 'rgba(255,59,48,0.9)';
-      ctx.lineWidth = w + 3 * dpr;
-      ctx.shadowColor = 'rgba(255,59,48,0.9)';
-      ctx.shadowBlur = 8 * dpr;
-      ctx.stroke();
-      // 红边圈
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = '#ff2d20';
-      ctx.lineWidth = w;
-      ctx.stroke();
-      // 白芯
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = Math.max(1, w - 2.5 * dpr);
-      ctx.stroke();
-    }
-    if (s.length === 1) {
-      // 单点:画个带光晕的圆
-      const w = widthOf(s[0]);
-      ctx.beginPath();
-      ctx.arc(s[0].x * dpr, s[0].y * dpr, w / 2, 0, Math.PI * 2);
-      ctx.fillStyle = '#ff2d20';
-      ctx.shadowColor = 'rgba(255,59,48,0.9)';
-      ctx.shadowBlur = 8 * dpr;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.beginPath();
-      ctx.arc(s[0].x * dpr, s[0].y * dpr, Math.max(1, w / 2 - 1.25 * dpr), 0, Math.PI * 2);
-      ctx.fillStyle = '#fff';
-      ctx.fill();
-    }
-  }
+  if (baked) ctx.drawImage(baked, 0, 0);
+  for (let i = 0; i + 1 < cur.length; i++) strokeSegment(ctx, cur[i], cur[i + 1], dpr);
+  if (cur.length === 1) strokeSegment(ctx, cur[0], null, dpr);
   ctx.shadowBlur = 0;
 }
 function requestRender() {
@@ -144,14 +136,19 @@ function trailDown(e) {
   drawing = true;
   if (trailFading.value) {
     trailFading.value = false;
-    strokes = [];
+    const b = baked && baked.getContext('2d');
+    b && b.clearRect(0, 0, baked.width, baked.height);
+    cur = [];
   }
   fitTrail();
-  strokes.push([contentPoint(e)]);
+  cur = [contentPoint(e)];
   requestRender();
 }
 function trailMove(e) {
-  strokes.at(-1).push(contentPoint(e));
+  const p = contentPoint(e), last = cur.at(-1);
+  // 太密的点跳过,减绘计量也减轻慢画时的光晕叠色
+  if (Math.hypot(p.x - last.x, p.y - last.y) < 1.5) return;
+  cur.push(p);
   requestRender();
 }
 function trailUp() {
@@ -160,11 +157,22 @@ function trailUp() {
   if (!drawing) return;
   drawing = false;
   clearTimeout(fadeTimer);
+  // 当前笔画烘焙进离屏层,后续帧不再重画它
+  if (baked && cur.length) {
+    const b = baked.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    b.lineCap = 'round';
+    for (let i = 0; i + 1 < cur.length; i++) strokeSegment(b, cur[i], cur[i + 1], dpr);
+    if (cur.length === 1) strokeSegment(b, cur[0], null, dpr);
+  }
+  cur = [];
+  requestRender();
   fadeTimer = setTimeout(() => {
     trailFading.value = true; // CSS 0.8s 淡出,结束后清空
     setTimeout(() => {
       trailFading.value = false;
-      strokes = [];
+      const b = baked && baked.getContext('2d');
+      b && b.clearRect(0, 0, baked.width, baked.height);
       ctx && renderTrail();
     }, 800);
   }, 1000);
