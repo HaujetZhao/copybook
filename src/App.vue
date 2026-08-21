@@ -268,6 +268,8 @@ function onPointerUp(e) {
   overflow: visible;
   pointer-events: none;
   transition: opacity 0.8s;
+  /* 红色光晕挂在 svg 根上:Safari 对 SVG 子元素的 CSS filter 支持不稳 */
+  filter: drop-shadow(0 0 4px #ff3b30cc) drop-shadow(0 0 10px #ff3b3088);
 }
 .trail polyline {
   fill: none;
@@ -275,7 +277,6 @@ function onPointerUp(e) {
   stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 4px #ff3b30cc) drop-shadow(0 0 10px #ff3b3088);
 }
 .trail.fading { opacity: 0; }
 .laser-dot {
