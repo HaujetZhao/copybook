@@ -146,22 +146,10 @@ function segWidth() {
 }
 // 画整条笔画:先把全部红外圈画完,再画全部白芯 ——
 // 若逐段红白交替,后一段的红圈会盖住前一段的白芯,接头处出现红斑。
-// 平滑两级:①滑动平均滤掉手抖噪声(端点保持原位不收缩);
-// ②中点二次曲线 —— 以采样点为控制点、相邻中点为端点连圆滑曲线。
-function smoothPts(pts) {
-  if (pts.length < 3) return pts;
-  return pts.map((p, i) => {
-    if (i === 0 || i === pts.length - 1) return p;
-    return {
-      x: (pts[i - 1].x + 2 * p.x + pts[i + 1].x) / 4,
-      y: (pts[i - 1].y + 2 * p.y + pts[i + 1].y) / 4,
-    };
-  });
-}
-function strokePath(c2d, rawPts, dpr) {
+// 锯齿平滑:中点二次曲线 —— 以采样点为控制点、相邻中点为端点连圆滑曲线。
+function strokePath(c2d, pts, dpr) {
   c2d.lineCap = 'round';
   c2d.lineJoin = 'round';
-  const pts = smoothPts(rawPts);
   // 构建第 i 段路径:中点(i-1,i)→中点(i,i+1),控制点 i;首尾段接原端点
   const seg = (i) => {
     const a = pts[i], b = pts[i + 1];
@@ -237,8 +225,8 @@ function trailMove(e) {
   // 每 20 个 move 采样一条,够诊断又不刷屏
   if (debug.value && ++debugMoveCount % 20 === 0) updateDebug(e);
   const p = contentPoint(e), last = cur.at(-1);
-  // 太密的点跳过:降绘计量,也让平滑滤波的采样间距更均匀
-  if (Math.hypot(p.x - last.x, p.y - last.y) < 2.5) return;
+  // 太密的点跳过,减绘计量
+  if (Math.hypot(p.x - last.x, p.y - last.y) < 1.5) return;
   cur.push(p);
   requestRender();
 }
