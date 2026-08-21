@@ -94,19 +94,33 @@ function widthOf(pt) {
   return (4 + 5 * (pt.p ?? 0.5)) * dpr;
 }
 // 画整条笔画:先把全部红外圈画完,再画全部白芯 ——
-// 若逐段红白交替,后一段的红圈会盖住前一段的白芯,接头处出现红斑
+// 若逐段红白交替,后一段的红圈会盖住前一段的白芯,接头处出现红斑。
+// 锯齿平滑:中点二次曲线 —— 以采样点为控制点、相邻中点为端点连圆滑曲线。
 function strokePath(c2d, pts, dpr) {
   c2d.lineCap = 'round';
-  const seg = (a, b) => {
-    const w = Math.max(widthOf(a), widthOf(b));
+  c2d.lineJoin = 'round';
+  // 构建第 i 段路径:中点(i-1,i)→中点(i,i+1),控制点 i;首尾段接原端点
+  const seg = (i) => {
+    const a = pts[i], b = pts[i + 1];
     c2d.beginPath();
-    c2d.moveTo(a.x * dpr, a.y * dpr);
-    if (b) c2d.lineTo(b.x * dpr, b.y * dpr);
-    else c2d.lineTo(a.x * dpr + 0.01, a.y * dpr);
-    return w;
+    if (i === 0) {
+      c2d.moveTo(a.x * dpr, a.y * dpr);
+    } else {
+      const m0x = (pts[i - 1].x + a.x) / 2, m0y = (pts[i - 1].y + a.y) / 2;
+      c2d.moveTo(m0x * dpr, m0y * dpr);
+    }
+    if (i + 2 >= pts.length) {
+      c2d.lineTo(b.x * dpr, b.y * dpr);
+    } else {
+      const m1x = (a.x + b.x) / 2, m1y = (a.y + b.y) / 2;
+      c2d.quadraticCurveTo(b.x * dpr, b.y * dpr, m1x * dpr, m1y * dpr);
+    }
+    return Math.max(widthOf(a), widthOf(b));
   };
   if (pts.length === 1) {
-    const w = seg(pts[0], null);
+    const w = widthOf(pts[0]);
+    c2d.beginPath();
+    c2d.arc(pts[0].x * dpr, pts[0].y * dpr, w / 2, 0, Math.PI * 2);
     c2d.strokeStyle = '#ff3b30';
     c2d.lineWidth = w;
     c2d.stroke();
@@ -117,12 +131,12 @@ function strokePath(c2d, pts, dpr) {
   }
   for (let i = 0; i + 1 < pts.length; i++) {
     c2d.strokeStyle = '#ff3b30';
-    c2d.lineWidth = seg(pts[i], pts[i + 1]);
+    c2d.lineWidth = seg(i);
     c2d.stroke();
   }
   for (let i = 0; i + 1 < pts.length; i++) {
     c2d.strokeStyle = '#fff';
-    c2d.lineWidth = Math.max(1, seg(pts[i], pts[i + 1]) - 3 * dpr);
+    c2d.lineWidth = Math.max(1, seg(i) - 3 * dpr);
     c2d.stroke();
   }
 }
