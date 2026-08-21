@@ -100,8 +100,12 @@ if (debug.value) {
 
 function contentPoint(e) {
   const r = canvasEl.value.getBoundingClientRect();
-  return { x: e.clientX - r.left + canvasEl.value.scrollLeft, y: e.clientY - r.top + canvasEl.value.scrollTop, p: e.pressure || 0.5 };
+  // 压力原始信号抖动大(相邻采样能跳 0.02↔0.19),指数平滑后再用
+  const raw = e.pressure || 0.5;
+  pSmooth = pSmooth == null || e.type === 'pointerdown' ? raw : pSmooth + 0.25 * (raw - pSmooth);
+  return { x: e.clientX - r.left + canvasEl.value.scrollLeft, y: e.clientY - r.top + canvasEl.value.scrollTop, p: pSmooth };
 }
+let pSmooth = null;
 // canvas 尺寸跟随滚动区域(含 devicePixelRatio,保证光晕不糊)
 function fitTrail() {
   const c = trailEl.value, host = canvasEl.value;
@@ -151,6 +155,10 @@ function widthOf(pt) {
   const dpr = window.devicePixelRatio || 1;
   return (1.5 + 6 * normPressure(pt.p)) * dpr;
 }
+// 段宽取两端均值而非较大值,轻重过渡更跟手
+function segWidth(a, b) {
+  return (widthOf(a) + widthOf(b)) / 2;
+}
 // 画整条笔画:先把全部红外圈画完,再画全部白芯 ——
 // 若逐段红白交替,后一段的红圈会盖住前一段的白芯,接头处出现红斑。
 // 锯齿平滑:中点二次曲线 —— 以采样点为控制点、相邻中点为端点连圆滑曲线。
@@ -173,7 +181,7 @@ function strokePath(c2d, pts, dpr) {
       const m1x = (a.x + b.x) / 2, m1y = (a.y + b.y) / 2;
       c2d.quadraticCurveTo(b.x * dpr, b.y * dpr, m1x * dpr, m1y * dpr);
     }
-    return Math.max(widthOf(a), widthOf(b));
+    return segWidth(a, b);
   };
   if (pts.length === 1) {
     const w = widthOf(pts[0]);
