@@ -57,6 +57,15 @@ function laserEnd(e) {
 // 每帧只需 drawImage(烘焙层) + 重绘当前这一笔,成本恒定不随笔迹总量增长。
 // 纯红色笔迹,线宽随笔压力变化。
 const trailFading = ref(false);
+// ?debug 打开右上角调试面板:显示 dpr/画布尺寸/最近压力采样,用于真机诊断
+const debug = ref(location.search.includes('debug'));
+const debugInfo = ref('');
+function updateDebug(e) {
+  if (!debug.value) return;
+  const c = trailEl.value;
+  debugInfo.value =
+    `dpr ${window.devicePixelRatio} | bitmap ${c ? c.width + 'x' + c.height : '-'} | css ${c ? c.style.width + 'x' + c.style.height : '-'} | scroll ${canvasEl.value ? canvasEl.value.scrollWidth + 'x' + canvasEl.value.scrollHeight : '-'} | press ${e.pressure} type ${e.pointerType}`;
+}
 let fadeTimer = null;
 let drawing = false;
 const canvasEl = ref(null);
@@ -183,6 +192,7 @@ function trailDown(e) {
   requestRender();
 }
 function trailMove(e) {
+  updateDebug(e);
   const p = contentPoint(e), last = cur.at(-1);
   // 太密的点跳过,减绘计量也减轻慢画时的光晕叠色
   if (Math.hypot(p.x - last.x, p.y - last.y) < 1.5) return;
@@ -270,6 +280,7 @@ function onPointerUp(e) {
     <!-- 激光点放 body 层级,fixed 定位避免被画布滚动影响 -->
     <Teleport to="body">
       <div v-if="laser" class="laser-dot" :style="{ left: laser.x + 'px', top: laser.y + 'px' }"></div>
+      <div v-if="debug" class="debug-panel">{{ debugInfo }}</div>
     </Teleport>
   </div>
 </template>
@@ -381,6 +392,20 @@ function onPointerUp(e) {
 .trail.fading {
   opacity: 0;
   transition: opacity 0.8s;
+}
+.debug-panel {
+  position: fixed;
+  top: 4px;
+  right: 6px;
+  z-index: 10000;
+  font-family: monospace;
+  font-size: 11px;
+  color: #fff;
+  background: #000c;
+  padding: 4px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  max-width: 90vw;
 }
 .laser-dot {
   position: fixed;
