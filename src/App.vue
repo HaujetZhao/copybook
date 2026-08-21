@@ -158,12 +158,8 @@ function requestRender() {
 function trailDown(e) {
   clearTimeout(fadeTimer);
   drawing = true;
-  if (trailFading.value) {
-    trailFading.value = false;
-    const b = baked && baked.getContext('2d');
-    b && b.clearRect(0, 0, baked.width, baked.height);
-    cur = [];
-  }
+  // 淡出中落笔:取消淡出,旧笔迹保留(瞬间恢复,不清空),继续接着画
+  trailFading.value = false;
   fitTrail();
   cur = [contentPoint(e)];
   requestRender();
@@ -362,9 +358,12 @@ function onPointerUp(e) {
   top: 0;
   left: 0;
   pointer-events: none;
+}
+/* transition 只挂在淡出态:取消淡出时旧迹瞬间恢复,不回放动画 */
+.trail.fading {
+  opacity: 0;
   transition: opacity 0.8s;
 }
-.trail.fading { opacity: 0; }
 .laser-dot {
   position: fixed;
   width: 10px;
