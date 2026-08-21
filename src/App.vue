@@ -107,13 +107,16 @@ function fitTrail() {
   const c = trailEl.value, host = canvasEl.value;
   if (!c || !host) return;
   const dpr = window.devicePixelRatio || 1;
-  const w = host.scrollWidth * dpr, h = host.scrollHeight * dpr;
+  // 先把 CSS 尺寸读出来存局部:设了位图宽度后 canvas 会以原尺寸参与布局,
+  // 之后再读 scrollWidth 已被自己撑大,CSS 宽就会被设成位图宽 → 画布 2 倍拉伸发糊
+  const sw = host.scrollWidth, sh = host.scrollHeight;
+  const w = sw * dpr, h = sh * dpr;
   if (c.width === w && c.height === h) return;
   // 扩容时把烘焙层内容搬到新尺寸
   const old = baked;
   c.width = w; c.height = h;
-  c.style.width = host.scrollWidth + 'px';
-  c.style.height = host.scrollHeight + 'px';
+  c.style.width = sw + 'px';
+  c.style.height = sh + 'px';
   ctx = c.getContext('2d');
   baked = document.createElement('canvas');
   baked.width = w; baked.height = h;
@@ -133,10 +136,20 @@ window.addEventListener('resize', refreshTrailLayer);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTrailLayer(); });
 // 字体加载完成后布局会变高,重新适配画布,避免位图被拉伸发糊
 document.fonts?.ready?.then(refreshTrailLayer);
-// 每点带压力 p(笔 0~1,鼠标恒 0.5),线宽随压力变化;低起点让提笔能收尖
+// 线宽随压力变化。Apple Pencil 在 Safari 里 pressure 实际只报 0.03~0.13 这类小区间
+// 而非规范上的 0~1,固定映射会让笔画永远细 —— 用运行期 min/max 自适应归一化。
+// 鼠标恒报 0.5(区间宽度为 0 时落到中值)。
+let pMin = 1, pMax = 0;
+function normPressure(p) {
+  pMin = Math.min(pMin, p);
+  pMax = Math.max(pMax, p);
+  const range = pMax - pMin;
+  if (range < 0.01) return 0.5; // 只有一个压力值(鼠标)时取中值
+  return (p - pMin) / range;
+}
 function widthOf(pt) {
   const dpr = window.devicePixelRatio || 1;
-  return (1.5 + 6 * (pt.p ?? 0.5)) * dpr;
+  return (1.5 + 6 * normPressure(pt.p)) * dpr;
 }
 // 画整条笔画:先把全部红外圈画完,再画全部白芯 ——
 // 若逐段红白交替,后一段的红圈会盖住前一段的白芯,接头处出现红斑。
