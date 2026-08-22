@@ -9,8 +9,13 @@ const themes = [
 
 // 持久化:主题/字号/可编辑状态存 localStorage,刷新后恢复
 const saved = JSON.parse(localStorage.getItem('jxp') || '{}');
+const fonts = [
+  { name: '行楷', family: "'荆霄鹏行楷', KaiTi, serif" },
+  { name: '妙草', family: "'汉仪妙草', KaiTi, serif" },
+];
 const editable = ref(saved.editable ?? true);
 const size = ref(saved.size ?? 50);
+const font = ref(fonts.find(f => f.name === saved.font) ?? fonts[0]);
 const laserMode = ref(saved.laserMode ?? 'dot'); // 'dot' 点跟随 | 'trail' 荧光笔迹
 const theme = ref(themes.find(t => t.name === saved.theme) ?? themes[2]); // 默认黛蓝
 
@@ -37,9 +42,10 @@ function saveText(e) {
   cur.text = e.target.innerText;
   localStorage.setItem('jxp', JSON.stringify(cur));
 }
-watch([editable, size, laserMode, theme], () => {
+const showSettings = ref(false);
+watch([editable, size, font, laserMode, theme], () => {
   localStorage.setItem('jxp', JSON.stringify({
-    editable: editable.value, size: size.value, laserMode: laserMode.value, theme: theme.value.name,
+    editable: editable.value, size: size.value, font: font.value.name, laserMode: laserMode.value, theme: theme.value.name,
     text: canvasEl.value?.innerText,
   }));
 }, { deep: true });
@@ -185,6 +191,8 @@ window.addEventListener('resize', refreshTrailLayer);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTrailLayer(); });
 // 字体加载完成后布局会变高,重新适配画布,避免位图被拉伸发糊
 document.fonts?.ready?.then(refreshTrailLayer);
+// 切字体后布局尺寸变化,重新适配笔迹画布
+watch(font, () => requestAnimationFrame(refreshTrailLayer));
 // 固定线宽(压感方案已移除,待重新规划):红外圈 4px,白芯 2px(4-2)
 function widthOf() {
   const dpr = window.devicePixelRatio || 1;
@@ -347,16 +355,35 @@ function onPointerUp(e) {
 <template>
   <div class="page" :style="theme.vars">
     <div class="toolbar">
-      <label class="size">
-        <input type="range" v-model.number="size" min="16" max="200" />
-        <span>{{ size }}px</span>
-      </label>
-      <div class="seg">
-        <button
-          v-for="t in themes" :key="t.name"
-          :class="{ active: t.name === theme.name }"
-          @click="theme = t"
-        >{{ t.name }}</button>
+      <div class="toolbar-left">
+        <button class="gear" @click="showSettings = !showSettings" :class="{ active: showSettings }">⚙</button>
+        <div v-if="showSettings" class="settings">
+          <div class="settings-row">
+            <span class="settings-label">字体</span>
+            <div class="seg">
+              <button
+                v-for="f in fonts" :key="f.name"
+                :class="{ active: f.name === font.name }"
+                @click="font = f"
+              >{{ f.name }}</button>
+            </div>
+          </div>
+          <label class="size">
+            <span class="settings-label">字号</span>
+            <input type="range" v-model.number="size" min="16" max="200" />
+            <span class="size-val">{{ size }}px</span>
+          </label>
+          <div class="settings-row">
+            <span class="settings-label">主题</span>
+            <div class="seg">
+              <button
+                v-for="t in themes" :key="t.name"
+                :class="{ active: t.name === theme.name }"
+                @click="theme = t"
+              >{{ t.name }}</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="seg" :class="{ disabled: editable }">
         <button :disabled="editable" :class="{ active: laserMode === 'dot' }" @click="laserMode = 'dot'">光点</button>
@@ -374,7 +401,7 @@ function onPointerUp(e) {
       class="canvas"
       :class="{ laser: !editable }"
       :contenteditable="editable"
-      :style="{ fontSize: size + 'px' }"
+      :style="{ fontSize: size + 'px', fontFamily: font.family }"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
@@ -426,20 +453,59 @@ function onPointerUp(e) {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
+}
+.toolbar-left { position: relative; }
+.gear {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--muted);
+  background: var(--canvas);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.gear.active {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.settings {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  min-width: 280px;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px #0004;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.settings-label {
+  min-width: 34px;
+  font-size: 13px;
+  color: var(--muted);
 }
 .size {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 80px;
-  max-width: 160px;
+  gap: 12px;
   color: var(--muted);
   font-size: 13px;
 }
 .size input[type='range'] { flex: 1; accent-color: var(--accent); }
-.size span { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+.size .size-val { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
 
 .seg {
   display: flex;
@@ -511,7 +577,6 @@ function onPointerUp(e) {
   flex: 1;
   overflow: auto;
   padding: 24px;
-  font-family: '荆霄鹏行楷', KaiTi, serif;
   background: var(--canvas);
   border: 1px solid transparent;
   border-radius: 12px;

@@ -3,6 +3,11 @@
   src: url('./assets/fonts/JingXiaoPengXingKai.ttf') format('truetype');
   font-display: swap;
 }
+@font-face {
+  font-family: '汉仪妙草';
+  src: url('./assets/fonts/HYMiaoCaoW.ttf') format('truetype');
+  font-display: swap;
+}
 
 html, body, #app { height: 100%; margin: 0; }
 
